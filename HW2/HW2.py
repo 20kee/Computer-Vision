@@ -3,21 +3,24 @@ import numpy as np
 import math
 
 def boxfilter(n):
-#짝수 예외처리
+    #짝수 예외처리
     assert n%2!=0, "dimension must be odd"
     #element가 1/(n*n)이고 크기가 n*n인 배열 생성
     box_filter = np.full((n,n), 1/(n*n))
     return box_filter
+
 # print(boxfilter(3), end='\n')
 # print(boxfilter(4), end='\n')
 # print(boxfilter(7), end='\n')
 
 def gauss1d(sigma):
-    length = math.ceil(sigma*6)+ (1 if math.ceil(sigma*6)%2 == 0 else 0) # 시그마*6 보다 큰 가장 작은 홀수
+    # 시그마*6 보다 큰 가장 작은 홀수
+    length = math.ceil(sigma*6) + (1 if math.ceil(sigma*6)%2 == 0 else 0) 
 
     # 0 ~ 1-length 를 x로 보고 가우시안 식에 대입.
     # 이 결과는 정규화되지 않음
-    unnormalized_gauss1d_filter = np.array([ ( 1 / math.sqrt(2*math.pi*sigma*sigma) ) * ( 1 / math.e ** ((i - length//2)**2 / (2*(sigma**2))) ) for i in range(length) ])
+    unnormalized_gauss1d_filter = np.array([ ( 1 / math.sqrt(2*math.pi*sigma*sigma) ) * 
+                                            ( 1 / math.e ** ((i - length//2)**2 / (2*(sigma**2))) ) for i in range(length) ])
     
     # 원소들의 합이 1이 나오도록 정규화
     gauss1d_filter = unnormalized_gauss1d_filter / sum(unnormalized_gauss1d_filter)
@@ -30,7 +33,10 @@ def gauss1d(sigma):
 
 def gauss2d(sigma):
     # 1D 가우시안 필터 두개의 외적을 통해 2D 가우시안 필터 생성
-    gauss2d_filter = np.outer(gauss1d(sigma), gauss1d(sigma))
+    gauss1d_filter = gauss1d(sigma)
+    gauss2d_filter = np.outer(gauss1d_filter, gauss1d_filter)
+
+    # 정규화 된 gauss1d를 사용하여 따로 정규화하지 않아도 이미 정규화된 상태이므로 바로 리턴.
     return gauss2d_filter
 
 # print(gauss2d(0.5), end='\n')
@@ -41,16 +47,17 @@ def convolve2d(array, filter):
     flipped_filter = np.flip(filter)
     filter_length = filter.shape[1]
 
-    filtered_array = np.zeros(array.shape)
     rows, columns = array.shape
-    for n in range(rows):
-        for m in range(columns):
-            # 각 픽셀에 대해 필터 적용
-            for n2 in range(n - filter_length//2, n + filter_length//2 + 1):
-                for m2 in range(m - filter_length//2, m + filter_length//2 + 1):
-                    # 필터와 곱할 픽셀 값을 얻어옴. 만약 Array의 범위를 벗어난다면 zero padding을 고려함.
-                    pixel = array[n2][m2] if n2 >= 0 and n2 < rows and m2 >= 0 and m2 < columns else 0
-                    filtered_array[n][m] += pixel * flipped_filter[n2-n+filter_length//2][m2-m+filter_length//2]
+
+    # 모서리부분 콘볼루션을 위해 제로 패딩을 입혀준다.
+    padding_size = (filter_length-1)//2
+    array = np.pad(array, ((padding_size, padding_size),(padding_size, padding_size)), 'constant', constant_values=0)
+
+    # 콘볼루션 결과를 저장할 array
+    filtered_array = np.zeros((rows, columns))
+    for row in range(rows):
+        for column in range(columns):
+            filtered_array[row][column] = (array[row:row+filter_length, column:column+filter_length]*flipped_filter).sum()
 
     return filtered_array
 
@@ -59,74 +66,77 @@ def gaussconvolve2d(array, sigma):
     filter = gauss2d(sigma)
 
     # 콘볼루션
-    filtered_array = convolve2d(array, filter).astype(np.uint8)
+    filtered_array = convolve2d(array, filter)
     return filtered_array
 
 def part1_4():
-    img = Image.open('3a_lion.bmp')
+    # 이미지 오픈
+    img = Image.open('3a_lion.bmp').convert('L')
+    # 이미지를 어레이 형태로 변환
     img_array = np.asarray(img)
-    #implement
-    # greyscale로 변환하여 저장할 array 선언
-    img_array_greyscale = np.zeros((img_array.shape[0], img_array.shape[1]))
-    for n in range(img_array.shape[0]):
-        for m in range(img_array.shape[1]):
-            # 변환 공식
-            img_array_greyscale[n][m] = 0.2989 * img_array[n][m][0] + 0.5870 * img_array[n][m][1] + 0.1140 * img_array[n][m][2]
-    
+
     # 가우시안 필터 적용
-    filtered_array = gaussconvolve2d(img_array_greyscale, 3)
-    filtered_img = Image.fromarray(filtered_array)
+    filtered_array = gaussconvolve2d(img_array, 3)
+
+    # uint8 형태로 변환 뒤 img show
+    filtered_img = Image.fromarray(filtered_array.astype(np.uint8))
     filtered_img.show()
     return filtered_array
 # part1_4()
 
-def part2_1():
-    img = Image.open('3a_lion.bmp')
-    img_array = np.asarray(img)
-    red_array = img_array[:, :, 0]
-    filtered_red_array = gaussconvolve2d(red_array, 3)
-    print(filtered_red_array)
-    green_array = img_array[:, :, 1]
-    filtered_green_array = gaussconvolve2d(green_array, 3)
-    print(filtered_green_array)
-    blue_array = img_array[:, :, 2]
-    filtered_blue_array = gaussconvolve2d(blue_array, 3)
-    print(filtered_blue_array)
 
-    low_freq_list = []
-    for n in range(img_array.shape[0]):
-        temp_list = []
-        for m in range(img_array.shape[1]):
-            temp_list.append([filtered_red_array[n][m], filtered_green_array[n][m], filtered_blue_array[n][m]])
-        low_freq_list.append(temp_list)
-    low_freq_array = np.array(low_freq_list)
+#low frequency image 얻어오는 함수
+def part2_1(img_file):
+    # 이미지 오픈
+    img = Image.open(img_file)
 
+    # colors에는 R의 어레이, G의 어레이, B의 어레이 총 3개의 2차원 배열이 들어간다.
+    colors = img.split()
 
-    filtered_img = Image.fromarray(low_freq_array.astype(np.uint8))
+    # colors를 콘볼루션한 이미지를 담을 배열 선언
+    rgb_imgs = []
+    for i in range(3):
+        rgb_imgs.append(Image.fromarray(gaussconvolve2d(np.asarray(colors[i]), 3).astype(np.uint8)))
+
+    # merge 함수를 통해 RGB 세개의 배열을 다시 하나로 합쳐준다.
+    filtered_img = Image.merge('RGB', ((rgb_imgs[0], rgb_imgs[1], rgb_imgs[2])))
     filtered_img.show()
+    low_freq_array = np.asarray(filtered_img)
     return low_freq_array
-# part2_1()
+# part2_1('3a_lion.bmp')
 
-def part2_2():
-    img = Image.open('3a_lion.bmp')
+# high frequency image 얻어오는 함수
+def part2_2(img_file):
+    # 이미지 오픈
+    img = Image.open(img_file)
     img_array = np.asarray(img)
-    low_freq_array = part2_1()
 
-    high_freq_array = img_array - low_freq_array
-    print(np.min(high_freq_array))
-    high_freq_array = high_freq_array + np.min(high_freq_array)
-    print(high_freq_array)
+    # part2_1 함수를 통해 low freq image 획득
+    low_freq_array = part2_1(img_file)
 
-
-    high_freq_array2 = high_freq_array + np.min(high_freq_array) + 30
-    print(high_freq_array2)
-
-    high_freq_img = Image.fromarray(high_freq_array.astype(np.uint8))
-    high_freq_img.show()
-
-
-    high_freq_img = Image.fromarray(high_freq_array2.astype(np.uint8))
+    # 음수의 값을 갖는 수를 제거하기 위해 0~255의 평균인 128을 더해준다.
+    high_freq_array = img_array - low_freq_array + 128
+    
+    high_freq_img = Image.fromarray(high_freq_array)
     high_freq_img.show()
     return high_freq_array
 
-part2_2()
+# part2_2('3b_tiger.bmp')
+
+def part2_3():
+    # 각 이미지에 대해 low freq img와 high freq img를 얻는다.
+    low_freq_array = part2_1('3a_lion.bmp')
+    high_freq_array = part2_2('3b_tiger.bmp')
+
+    # 연산에서 255보다 큰 값이 발생하므로 uint16타입으로 변환한 후 더하여야 한다.
+    new_array = low_freq_array.astype(np.int16) + high_freq_array.astype(np.int16)
+    
+    # 0~255의 값으로 변환
+    new_array =  new_array / np.amax(new_array) * 255
+
+    # 이미지로 읽을 때는 다시 uint8 타입으로 변경해주어야 한다.
+    new_img = Image.fromarray(new_array.astype(np.uint8))
+    new_img.show()
+    return new_array
+
+part2_3()
