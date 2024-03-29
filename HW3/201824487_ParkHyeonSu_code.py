@@ -38,8 +38,8 @@ def gaussconvolve2d(array,sigma):
 
 def sobel_filters(img):
     #x_filter와 y_filter를 선언한다.
-    x_filter = np.array([[-1,0,1],[-2,0,2],[-1,0,1]], np.float32)
-    y_filter = np.array([[1,2,1],[0,0,0],[-1,-2,-1]], np.float32)
+    x_filter = np.array([[1,0,-1],[2,0,-2],[1,0,-1]], np.float32)
+    y_filter = np.array([[-1,-2,-1],[0,0,0],[1,2,1]], np.float32)
     #받아온 이미지에 각각 x_filter와 y_filter를 convolution한다.
     Ix_array = convolve2d(img,x_filter)
     Iy_array = convolve2d(img,y_filter)
@@ -49,8 +49,8 @@ def sobel_filters(img):
     theta = np.arctan2(Iy_array,Ix_array)
     #픽셀값 범위 밖의 값들을 처리해준다.
     G = G/G.max() * 255
-    np.where(G>255,255,G)
-    np.where(G<0,0,G)
+    # np.where(G>255,255,G)
+    # np.where(G<0,0,G)
     """ Returns gradient magnitude and direction of input img.
     Args:
         img: Grayscale image. Numpy array of shape (H, W).

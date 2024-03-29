@@ -61,7 +61,7 @@ def reduce_noise(img):
         res: gray scale gaussian filtered image (H, W).
     """
     greyscale_img = img.convert("L")
-    greyscale_img_array = np.asarray(greyscale_img, np.float32)
+    greyscale_img_array = np.asarray(greyscale_img, dtype=np.float32)
 
     res = gaussconvolve2d(greyscale_img_array, 1.6)
     return res
@@ -78,19 +78,16 @@ def sobel_filters(img):
     Hints:
         - Use np.hypot and np.arctan2 to calculate square root and arctan
     """
-    x_filter = np.array([[-1,0,1],[-2,0,2],[-1,0,1]], np.float32)
-    y_filter = np.array([[1,2,1],[0,0,0],[-1,-2,-1]], np.float32)
+    x_filter = np.array([[-1,0,1],[-2,0,2],[-1,0,1]], dtype=np.float32)
+    y_filter = np.array([[1,2,1],[0,0,0],[-1,-2,-1]], dtype=np.float32)
 
     x_intensity = convolve2d(img, x_filter)
     y_intensity = convolve2d(img, y_filter)
 
     G = np.hypot(x_intensity, y_intensity)
-    theta = np.arctan2(x_intensity, y_intensity)
+    theta = np.arctan2(y_intensity, x_intensity)
 
-    G = G/G.max() * 255
-    np.where(G>255,255,G)
-    np.where(G<0,0,G)
-
+    G = G/np.amax(G) * 255
     return (G, theta)
 
 def non_max_suppression(G, theta):
@@ -103,7 +100,20 @@ def non_max_suppression(G, theta):
     Returns:
         res: non-maxima suppressed image.
     """
-    pass
+    rows, columns = G.shape
+    theta = np.where(theta<0, theta+math.pi, theta)
+    res = np.zeros((rows-1, columns-1), dtype=np.int32)
+    for row in range(1, rows-1):
+        for column in range(1, columns-1):
+            radian = theta[row][column] 
+            if radian <= math.pi/8 or radian >= math.pi*7/8:
+                res[row-1][column-1] = 0 if max(G[row][column+1], G[row][column-1]) > G[row][column] else G[row][column]
+            elif radian > math.pi/8 and radian <= math.pi*3/8:
+                res[row-1][column-1] = 0 if max(G[row+1][column-1], G[row-1][column+1]) > G[row][column] else G[row][column]
+            elif radian > math.pi*3/8 and radian <= math.pi*5/8:
+                res[row-1][column-1] = 0 if max(G[row+1][column], G[row-1][column]) > G[row][column] else G[row][column]
+            elif radian > math.pi*5/8 and radian < math.pi*7/8:
+                res[row-1][column-1] = 0 if max(G[row+1][column+1], G[row-1][column-1]) > G[row][column] else G[row][column]
     return res
 
 def double_thresholding(img):
@@ -113,7 +123,14 @@ def double_thresholding(img):
     Returns:
         res: double_thresholded image.
     """
-    #implement     
+    diff = np.amax(img)-np.amin(img)
+    T_high = np.amin(img)+ diff * 0.15
+    T_low = np.amin(img) + diff * 0.03
+
+    res = np.where(img>T_high, 255, img)
+    res = np.where(res<T_low, 0, res)
+    res = np.where((res != 0) & (res != 255), 80, res)
+
     return res
 
 def dfs(img, res, i, j, visited=[]):
@@ -145,7 +162,13 @@ def hysteresis(img):
     Returns:
         res: hysteresised image.
     """
-    #implement 
+    visited = []
+    rows, columns = img.shape
+    res = np.zeros((rows, columns))
+    for row in range(rows):
+        for column in range(columns):
+            if (row, column) not in visited and img[row][column] == 255:
+                dfs(img, res, row, column, visited)
 
     return res
 
@@ -159,13 +182,13 @@ def main():
     Image.fromarray(g.astype('uint8')).save('./iguana_sobel_gradient.bmp', 'BMP')
     Image.fromarray(theta.astype('uint8')).save('./iguana_sobel_theta.bmp', 'BMP')
 
-    # non_max_suppression_img = non_max_suppression(g, theta)
-    # Image.fromarray(non_max_suppression_img.astype('uint8')).save('./iguana_non_max_suppression.bmp', 'BMP')
+    non_max_suppression_img = non_max_suppression(g, theta)
+    Image.fromarray(non_max_suppression_img.astype('uint8')).save('./iguana_non_max_suppression.bmp', 'BMP')
 
-    # double_threshold_img = double_thresholding(non_max_suppression_img)
-    # Image.fromarray(double_threshold_img.astype('uint8')).save('./iguana_double_thresholding.bmp', 'BMP')
+    double_threshold_img = double_thresholding(non_max_suppression_img)
+    Image.fromarray(double_threshold_img.astype('uint8')).save('./iguana_double_thresholding.bmp', 'BMP')
 
-    # hysteresis_img = hysteresis(double_threshold_img)
-    # Image.fromarray(hysteresis_img.astype('uint8')).save('./iguana_hysteresis.bmp', 'BMP')
+    hysteresis_img = hysteresis(double_threshold_img)
+    Image.fromarray(hysteresis_img.astype('uint8')).save('./iguana_hysteresis.bmp', 'BMP')
 
 main()
