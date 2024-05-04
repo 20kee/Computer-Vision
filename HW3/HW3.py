@@ -60,9 +60,13 @@ def reduce_noise(img):
     Returns:
         res: gray scale gaussian filtered image (H, W).
     """
+    # RGB scale의 이미지를 greyscale로 변경한다.
     greyscale_img = img.convert("L")
-    greyscale_img_array = np.asarray(greyscale_img, dtype=np.float32)
 
+    # 이미지를 float32 type으로 numpy array에 저장한다.
+    greyscale_img_array = np.asarray(greyscale_img, dtype=np.float32)
+    
+    # sigma=1.6 인 gaussian filter를 greyscale img array에 적용시켜 blur된 img의 array를 얻는다.
     res = gaussconvolve2d(greyscale_img_array, 1.6)
     return res
 
@@ -78,15 +82,24 @@ def sobel_filters(img):
     Hints:
         - Use np.hypot and np.arctan2 to calculate square root and arctan
     """
+    # gradient 계산을 위한 sobel filter 2개를 정의한다.
     x_filter = np.array([[-1,0,1],[-2,0,2],[-1,0,1]], dtype=np.float32)
-    y_filter = np.array([[1,2,1],[0,0,0],[-1,-2,-1]], dtype=np.float32)
+    y_filter = np.array([[-1,-2,-1],[0,0,0],[1,2,1]], dtype=np.float32)
 
+    # sobel filter와 convolution하여 x, y 축에 대한 Intensity array를 얻는다.
     x_intensity = convolve2d(img, x_filter)
     y_intensity = convolve2d(img, y_filter)
 
+    # 각 축의 gradient를 확인해보자.
+    Image.fromarray(x_intensity.astype('uint8')).save('./iguana_x_intensity.bmp', 'BMP')
+    Image.fromarray(y_intensity.astype('uint8')).save('./iguana_y_intensity.bmp', 'BMP')
+    
+    # sqrt(x_intensity^2 + y_intensity^2) 과정을 np.hypot함수를 통해 구현한다.
     G = np.hypot(x_intensity, y_intensity)
+    # 각 gradient의 방향을 np.arctan2 함수를 통해 구한다.
     theta = np.arctan2(y_intensity, x_intensity)
 
+    # 255의 범위를 넘는 값들을 위한 처리
     G = G/np.amax(G) * 255
     return (G, theta)
 
@@ -100,18 +113,37 @@ def non_max_suppression(G, theta):
     Returns:
         res: non-maxima suppressed image.
     """
+
     rows, columns = G.shape
+    
+    # 3, 4 분면에 존재하는 각들에 180도를 더해서 1, 2 사분면에 존재하도록 한다. 
+    # 이러면 theta의 범위가 -pi ~ pi 에서 0 ~ pi가 되므로 방향을 결정하기 쉽다.
     theta = np.where(theta<0, theta+math.pi, theta)
+
+    # 결과를 저장할 array
     res = np.zeros((rows-1, columns-1), dtype=np.int32)
+
+    # 테두리에서는 gradient의 방향을 알아도 비교할 대상 하나가 부족하므로 진행하지 않는다.
+    # 그래서 이 함수의 결과물은 기존 이미지에서 행과 열이 한 줄씩 줄어든 크기를 가진다.
     for row in range(1, rows-1):
         for column in range(1, columns-1):
+
+            # 각 픽셀의 theta값을 radian 변수에 저장한다.
             radian = theta[row][column] 
+
+            # radian이 다음 범위를 가진다면 x축 방향의 neighbor와 비교해야 한다. x축 = column
             if radian <= math.pi/8 or radian >= math.pi*7/8:
                 res[row-1][column-1] = 0 if max(G[row][column+1], G[row][column-1]) > G[row][column] else G[row][column]
+            
+            # 대각선 오른쪽 위 방향
             elif radian > math.pi/8 and radian <= math.pi*3/8:
                 res[row-1][column-1] = 0 if max(G[row+1][column-1], G[row-1][column+1]) > G[row][column] else G[row][column]
+
+            # y축 방향
             elif radian > math.pi*3/8 and radian <= math.pi*5/8:
                 res[row-1][column-1] = 0 if max(G[row+1][column], G[row-1][column]) > G[row][column] else G[row][column]
+
+            # 대각선 오른쪽 아래(왼쪽 위) 방향
             elif radian > math.pi*5/8 and radian < math.pi*7/8:
                 res[row-1][column-1] = 0 if max(G[row+1][column+1], G[row-1][column-1]) > G[row][column] else G[row][column]
     return res
@@ -124,11 +156,20 @@ def double_thresholding(img):
         res: double_thresholded image.
     """
     diff = np.amax(img)-np.amin(img)
+
+    # threshold 두 개를 설정
     T_high = np.amin(img)+ diff * 0.15
     T_low = np.amin(img) + diff * 0.03
 
+    # np.where 함수를 통해 기준에 맞는지 검사하고 각 기준에 맞는 값으로 변경한다.
+
+    # strong edge
     res = np.where(img>T_high, 255, img)
+
+    # non-relevant
     res = np.where(res<T_low, 0, res)
+
+    # weak edge
     res = np.where((res != 0) & (res != 255), 80, res)
 
     return res
@@ -164,9 +205,12 @@ def hysteresis(img):
     """
     visited = []
     rows, columns = img.shape
+
     res = np.zeros((rows, columns))
+    # 모든 좌표를 순회
     for row in range(rows):
         for column in range(columns):
+            # 방문하지 않았고(기존에 방문한 strong edge와 이어져있지 않았다면) strong edge라면
             if (row, column) not in visited and img[row][column] == 255:
                 dfs(img, res, row, column, visited)
 
@@ -191,4 +235,4 @@ def main():
     hysteresis_img = hysteresis(double_threshold_img)
     Image.fromarray(hysteresis_img.astype('uint8')).save('./iguana_hysteresis.bmp', 'BMP')
 
-main()
+main()  
