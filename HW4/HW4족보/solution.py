@@ -126,6 +126,7 @@ def KeypointProjection(xy_points, h):
     nomalizer = np.c_[nomal, nomal]
     # 나눠주는 수 nomalizer의 shape을 맞춰준다.
     xy_points_out = xy_point_out[:, [0,1]] / nomalizer
+    print(xy_points_out)
     # z값으로 x,y값을 나눠준다.
     # END
     

@@ -105,26 +105,17 @@ def KeypointProjection(xy_points, h):
     assert h.shape == (3, 3)
 
     # START
-    print(xy_points)
-    print()
-    one = [1]*len(xy_points)
-    # 차원을 추가할 모든 요소가 1인 column을 xy_points의 길이만큼 생성한다.
-    h_points = np.c_[xy_points, one]
-    # xy_points에 one column을 추가하여 3차원을 추가한다.
-    # 그 후h_points변수에 저장한다.
+    ones = np.ones(len(xy_points))
+    d3_points = np.c_[xy_points, ones]
 
-    xy_point_out = h.dot(h_points.T).T
-    # h matrix에 h_points들을 내적하고 shape를 맞춰준다.
-    nomal = xy_point_out[:, 2]
-    # 3차원의 값들을 저장하여 값이 0이면 1e-10으로 수정한다.
-    for i in nomal:
-        if i == 0:
-            i = 1e-10
-    nomalizer = np.c_[nomal, nomal]
-    # 나눠주는 수 nomalizer의 shape을 맞춰준다.
-    xy_points_out = xy_point_out[:, [0,1]] / nomalizer
-    # z값으로 x,y값을 나눠준다.
-    print(xy_points_out)
+    new_d3_points = h.dot(d3_points.T).T
+
+    for i in range(len(new_d3_points)):
+        if new_d3_points[i][-1] == 0:
+            new_d3_points[i][-1] = 1e-10
+        new_d3_points[i] = new_d3_points[i] / new_d3_points[i][-1]
+
+    xy_points_out = new_d3_points[:, [0,1]]
     # END
     return xy_points_out
 
@@ -156,7 +147,45 @@ def RANSACHomography(xy_src, xy_ref, num_iter, tol):
     tol = tol*1.0
 
     # START
+    maxInlier = 0
+    maxH = np.zeros(shape=(3,3))
+    for i in range(num_iter) :
+        # num_iter만큼 반복한다.
+        idx = random.sample(range(len(xy_src)), 4)
+        # 랜덤으로 최소한의 개수인 4개의 샘플의 좌표를 구한다.
+        A = []
+        # homography 구하기 위해 matrix A 를 먼저 구한다.
+        for j in range(4):
+            odd_line = [xy_src[idx[j]][0], xy_src[idx[j]][1], 1,
+                            0, 0, 0,
+                            -xy_ref[idx[j]][0]*xy_src[idx[j]][0], -xy_ref[idx[j]][0]*xy_src[idx[j]][1], -xy_ref[idx[j]][0]]
+            even_line = [0, 0, 0,
+                            xy_src[idx[j]][0], xy_src[idx[j]][1], 1,
+                            -xy_ref[idx[j]][1]*xy_src[idx[j]][0], -xy_ref[idx[j]][1]*xy_src[idx[j]][1], -xy_ref[idx[j]][1]]
+            A.append(odd_line)
+            A.append(even_line)
+        matrixA = np.array(A)
+        matrixATA = np.dot(matrixA.T, matrixA)
+        # A^T와 A의 내적 값을 구한다
+        # 내림차순으로 정렬된 V의 집합을 v변수에 저장하고
+        # 가장 작은 eigenvalue의 eigenvector 구한 후 shape를 맞춰준다.
+        _, __, v = np.linalg.svd(matrixATA, full_matrices = True)
+        h = np.reshape(v[-1], (3,3))
+        
+        inliers = 0
+        # 구한 h_matrix인 경우의 inliers 개수 세기
+        
+        xy_proj = KeypointProjection(xy_src, h)
+        for i in range(len(xy_proj)):
+            d = np.sqrt((xy_proj[i][0]-xy_ref[i][0])**2 + (xy_proj[i][1]-xy_ref[i][1])**2)
+            if tol > d : 
+                inliers+=1
+        # matching 거리가 tol값보다 작으면 inlier로 간주한다.
+        if maxInlier < inliers : 
+            maxInlier, maxH = inliers, h
+            # 전체를 반복하여 inlier 수가 가장 많은 matrix를 고른다.
 
+    h = maxH
 
 
     # END
