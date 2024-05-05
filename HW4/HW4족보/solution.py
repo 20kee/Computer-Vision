@@ -126,7 +126,6 @@ def KeypointProjection(xy_points, h):
     nomalizer = np.c_[nomal, nomal]
     # 나눠주는 수 nomalizer의 shape을 맞춰준다.
     xy_points_out = xy_point_out[:, [0,1]] / nomalizer
-    print(xy_points_out)
     # z값으로 x,y값을 나눠준다.
     # END
     
@@ -182,7 +181,7 @@ def RANSACHomography(xy_src, xy_ref, num_iter, tol):
         # 가장 작은 eigenvalue의 eigenvector 구한 후 shape를 맞춰준다.
         _, __, v = np.linalg.svd(matrixATA, full_matrices = True)
         h = np.reshape(v[-1], (3,3))
-        
+        print(h)
         inliers = 0
         # 구한 h_matrix인 경우의 inliers 개수 세기
         

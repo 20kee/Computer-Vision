@@ -50,8 +50,8 @@ def main():
     image_list = ['fountain4', 'fountain0']
 
     num_iter = 50
-    tol = 10
-    ratio_thres = 0.7
+    tol = 5
+    ratio_thres = 0.5
     image_list = [op.join(path, im) for im in image_list]
     create_pano(image_list, ratio_thres, canvas_height, canvas_width,
                 num_iter, tol, figsize=(20, 20))
@@ -62,9 +62,9 @@ def main():
     
     image_list = ['garden0', 'garden3', 'garden4']
 
-    num_iter = 70
-    tol = 10
-    ratio_thres = 0.7
+    num_iter = 50
+    tol = 5
+    ratio_thres = 0.5
     image_list = [op.join(path, im) for im in image_list]
     create_pano(image_list, ratio_thres, canvas_height, canvas_width,
                 num_iter, tol, figsize=(20, 20))
@@ -73,8 +73,8 @@ def main():
     image_list = ['irving_out3', 'irving_out6', 'irving_out5']#'Rainier1', 'Rainier2', 'Rainier3','Rainier4','Rainier5','Rainier6']
 
     num_iter = 50
-    tol = 10
-    ratio_thres = 0.7
+    tol = 5
+    ratio_thres = 0.5
     image_list = [op.join(path, im) for im in image_list]
     create_pano(image_list, ratio_thres, canvas_height, canvas_width,
                 num_iter, tol, figsize=(20, 20))

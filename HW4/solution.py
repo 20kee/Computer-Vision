@@ -147,46 +147,31 @@ def RANSACHomography(xy_src, xy_ref, num_iter, tol):
     tol = tol*1.0
 
     # START
-    maxInlier = 0
-    maxH = np.zeros(shape=(3,3))
-    for i in range(num_iter) :
-        # num_iter만큼 반복한다.
-        idx = random.sample(range(len(xy_src)), 4)
-        # 랜덤으로 최소한의 개수인 4개의 샘플의 좌표를 구한다.
+    max_inlier = 0 # 가장 많은 inlier의 수
+    h = np.zeros(shape=(3, 3))
+    for i in range(num_iter): # num_iter만큼 반복
+        srcs = random.sample(range(len(xy_src)), 4) # homography matrix를 구할 4개의 좌표
+
         A = []
-        # homography 구하기 위해 matrix A 를 먼저 구한다.
-        for j in range(4):
-            odd_line = [xy_src[idx[j]][0], xy_src[idx[j]][1], 1,
-                            0, 0, 0,
-                            -xy_ref[idx[j]][0]*xy_src[idx[j]][0], -xy_ref[idx[j]][0]*xy_src[idx[j]][1], -xy_ref[idx[j]][0]]
-            even_line = [0, 0, 0,
-                            xy_src[idx[j]][0], xy_src[idx[j]][1], 1,
-                            -xy_ref[idx[j]][1]*xy_src[idx[j]][0], -xy_ref[idx[j]][1]*xy_src[idx[j]][1], -xy_ref[idx[j]][1]]
-            A.append(odd_line)
-            A.append(even_line)
-        matrixA = np.array(A)
-        matrixATA = np.dot(matrixA.T, matrixA)
-        # A^T와 A의 내적 값을 구한다
-        # 내림차순으로 정렬된 V의 집합을 v변수에 저장하고
-        # 가장 작은 eigenvalue의 eigenvector 구한 후 shape를 맞춰준다.
-        _, __, v = np.linalg.svd(matrixATA, full_matrices = True)
-        h = np.reshape(v[-1], (3,3))
+        for j in range(4): # 방정식을 풀기 위한 A 매트릭스를 만든다.
+            A.append([xy_src[srcs[j]][0], xy_src[srcs[j]][1], 1, 0, 0, 0, -xy_ref[srcs[j]][0]*xy_src[srcs[j]][0], -xy_ref[srcs[j]][0]*xy_src[srcs[j]][1], -xy_ref[srcs[j]][0]])
+            A.append([0, 0, 0, xy_src[srcs[j]][0], xy_src[srcs[j]][1], 1, -xy_ref[srcs[j]][1]*xy_src[srcs[j]][0], -xy_ref[srcs[j]][1]*xy_src[srcs[j]][1], -xy_ref[srcs[j]][1]])
         
-        inliers = 0
-        # 구한 h_matrix인 경우의 inliers 개수 세기
-        
-        xy_proj = KeypointProjection(xy_src, h)
-        for i in range(len(xy_proj)):
-            d = np.sqrt((xy_proj[i][0]-xy_ref[i][0])**2 + (xy_proj[i][1]-xy_ref[i][1])**2)
-            if tol > d : 
-                inliers+=1
-        # matching 거리가 tol값보다 작으면 inlier로 간주한다.
-        if maxInlier < inliers : 
-            maxInlier, maxH = inliers, h
-            # 전체를 반복하여 inlier 수가 가장 많은 matrix를 고른다.
+        A = np.array(A)
+        ATA = np.dot(A.T, A) # ATA 매트릭스를 구한다.
+        v = np.linalg.svd(ATA, full_matrices=True)[2] # v에는 eigenvalue가 큰 순으로 eigenvector가 정렬되어 있다.
+        h2 = np.reshape(v[-1], (3,3)) # 가장 작은 eigenvalue를 가지는 eigenvector가 homography matrix가 된다.
 
-    h = maxH
+        inliers = 0 # 이제 inlier 개수를 구할 차례
+        xy_proj = KeypointProjection(xy_src, h2) # 하나의 샘플로 구한 매트릭스로 다 프로젝션 시켜보자
+        for k in range(len(xy_proj)):
+            d = ( (xy_proj[k][0]-xy_ref[k][0])**2 + (xy_proj[k][1]-xy_ref[k][1])**2 ) ** (0.5) # 프로젝션 후 거리 차이
+            if d < tol: # 거리가 threshold보다 작으면 inlier라고 판단
+                inliers += 1
 
+        if inliers > max_inlier: # inlier개수가 max_inlier보다 많으면 그때 matrix를 h에 저장
+            max_inlier = inliers
+            h = h2
 
     # END
     assert isinstance(h, np.ndarray)
